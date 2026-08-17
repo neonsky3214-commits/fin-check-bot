@@ -18,6 +18,10 @@ def _get_client() -> AsyncAnthropic:
         _client = AsyncAnthropic()
     return _client
 
+
+def _text(resp) -> str:
+    return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+
 CHECK_SYSTEM = """Ты — внимательный финансовый контролёр. Тебе присылают сообщения из рабочего чата.
 
 Задача:
@@ -53,13 +57,13 @@ async def check_report(text: str) -> dict | None:
             model=MODEL,
             max_tokens=1500,
             system=CHECK_SYSTEM,
-            messages=[
-                {"role": "user", "content": text},
-                {"role": "assistant", "content": "{"},
-            ],
+            messages=[{"role": "user", "content": text}],
         )
-        raw = "{" + resp.content[0].text
-        return json.loads(raw)
+        raw = _text(resp)
+        start, end = raw.find("{"), raw.rfind("}")
+        if start == -1 or end == -1:
+            raise ValueError(f"В ответе модели нет JSON: {raw[:200]}")
+        return json.loads(raw[start:end + 1])
     except Exception:
         log.exception("Ошибка при проверке отчёта")
         return None
@@ -80,7 +84,7 @@ async def make_summary(reports: list[dict], period_label: str) -> str | None:
             system=SUMMARY_SYSTEM,
             messages=[{"role": "user", "content": payload}],
         )
-        return resp.content[0].text
+        return _text(resp)
     except Exception:
         log.exception("Ошибка при формировании сводки")
         return None
