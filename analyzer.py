@@ -9,7 +9,14 @@ log = logging.getLogger(__name__)
 
 MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 
-_client = AsyncAnthropic()
+_client: AsyncAnthropic | None = None
+
+
+def _get_client() -> AsyncAnthropic:
+    global _client
+    if _client is None:
+        _client = AsyncAnthropic()
+    return _client
 
 CHECK_SYSTEM = """Ты — внимательный финансовый контролёр. Тебе присылают сообщения из рабочего чата.
 
@@ -42,7 +49,7 @@ SUMMARY_SYSTEM = """Ты — финансовый аналитик. Тебе д�
 async def check_report(text: str) -> dict | None:
     """Возвращает dict с результатом проверки или None при ошибке API."""
     try:
-        resp = await _client.messages.create(
+        resp = await _get_client().messages.create(
             model=MODEL,
             max_tokens=1500,
             system=CHECK_SYSTEM,
@@ -67,7 +74,7 @@ async def make_summary(reports: list[dict], period_label: str) -> str | None:
         lines.append(f"{r['date']} | {r['user_name']} | {r['summary']}{total_part}{err_part}")
     payload = f"Период: {period_label}\nОтчёты:\n" + "\n".join(lines)
     try:
-        resp = await _client.messages.create(
+        resp = await _get_client().messages.create(
             model=MODEL,
             max_tokens=1500,
             system=SUMMARY_SYSTEM,
