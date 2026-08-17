@@ -60,7 +60,9 @@ async def cmd_svodka(message: Message, command: CommandObject) -> None:
 async def on_text(message: Message) -> None:
     text = message.text or ""
     if not looks_like_report(text):
+        log.info("Фильтр отклонил сообщение: %r", text[:80])
         return
+    log.info("Сообщение похоже на отчёт, отправляю на проверку: %r", text[:80])
     result = await check_report(text)
     if result is None or not result.get("is_report"):
         return
