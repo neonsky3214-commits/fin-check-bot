@@ -39,6 +39,10 @@ def save_report(chat_id: int, message_id: int, user_name: str, text: str,
                 result: dict) -> None:
     with _connect() as conn:
         conn.execute(
+            "DELETE FROM reports WHERE chat_id = ? AND message_id = ?",
+            (chat_id, message_id),
+        )
+        conn.execute(
             "INSERT INTO reports (chat_id, message_id, user_name, date, text,"
             " total, has_errors, errors_json, summary)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",

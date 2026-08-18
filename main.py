@@ -55,10 +55,10 @@ async def cmd_svodka(message: Message, command: CommandObject) -> None:
     await note.edit_text(f"📊 Сводка {label}:\n\n{summary}")
 
 
-@dp.message(F.text, F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP,
-                                     ChatType.PRIVATE}))
-async def on_text(message: Message) -> None:
-    text = message.text or ""
+_CHATS = {ChatType.GROUP, ChatType.SUPERGROUP, ChatType.PRIVATE}
+
+
+async def _process(message: Message, text: str) -> None:
     if not looks_like_report(text):
         log.info("Фильтр отклонил сообщение: %r", text[:80])
         return
@@ -73,6 +73,26 @@ async def on_text(message: Message) -> None:
         await message.reply(f"⚠️ Нашёл расхождения в отчёте:\n{errors}")
     else:
         await message.reply("✅ Проверил: суммы сходятся.")
+
+
+@dp.message(F.text, F.chat.type.in_(_CHATS))
+async def on_text(message: Message) -> None:
+    await _process(message, message.text or "")
+
+
+@dp.message(F.caption, F.chat.type.in_(_CHATS))
+async def on_caption(message: Message) -> None:
+    await _process(message, message.caption or "")
+
+
+@dp.edited_message(F.text | F.caption, F.chat.type.in_(_CHATS))
+async def on_edited(message: Message) -> None:
+    await _process(message, message.text or message.caption or "")
+
+
+@dp.message()
+async def on_other(message: Message) -> None:
+    log.info("Сообщение без текста, пропускаю: type=%s", message.content_type)
 
 
 async def main() -> None:

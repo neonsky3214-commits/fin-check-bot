@@ -35,3 +35,14 @@ def test_other_chat_not_returned(tmp_path, monkeypatch):
     result = {"has_errors": False, "errors": [], "total": 5, "summary": "x"}
     db.save_report(-1001, 1, "A", "t", result)
     assert db.get_reports(-2002, days=7) == []
+
+
+def test_edited_message_replaces_row(tmp_path, monkeypatch):
+    db = _fresh_db(tmp_path, monkeypatch)
+    r1 = {"has_errors": True, "errors": ["ошибка"], "total": 90, "summary": "v1"}
+    r2 = {"has_errors": False, "errors": [], "total": 100, "summary": "v2"}
+    db.save_report(-1001, 7, "A", "t1", r1)
+    db.save_report(-1001, 7, "A", "t2", r2)
+    reports = db.get_reports(-1001, days=7)
+    assert len(reports) == 1
+    assert reports[0]["total"] == 100
