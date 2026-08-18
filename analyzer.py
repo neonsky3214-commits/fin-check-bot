@@ -35,9 +35,11 @@ CHECK_SYSTEM = """Ты — внимательный финансовый кон�
   "has_errors": true/false,
   "errors": ["описание расхождения по-русски", ...],
   "total": число или null,  // главный итог отчёта, если есть
+  "income": число или null,  // сумма ВСЕХ доходов/выручки, посчитанная тобой самостоятельно по статьям
+  "expenses": число или null,  // сумма ВСЕХ расходов, посчитанная тобой самостоятельно по статьям
   "summary": "одна строка: о чём отчёт и его итог"
 }
-Если is_report=false, остальные поля: has_errors=false, errors=[], total=null, summary=""."""
+Если is_report=false, остальные поля: has_errors=false, errors=[], total=null, income=null, expenses=null, summary=""."""
 
 SUMMARY_SYSTEM = """Ты — финансовый аналитик. Тебе дают список финансовых отчётов из рабочего чата за период (дата, автор, итог, краткое содержание, найденные ошибки).
 
@@ -55,7 +57,7 @@ async def check_report(text: str) -> dict | None:
     try:
         resp = await _get_client().messages.create(
             model=MODEL,
-            max_tokens=1500,
+            max_tokens=8000,
             system=CHECK_SYSTEM,
             messages=[{"role": "user", "content": text}],
         )
@@ -75,12 +77,18 @@ async def make_summary(reports: list[dict], period_label: str) -> str | None:
         errors = json.loads(r["errors_json"]) if r["errors_json"] else []
         err_part = f" | ошибки: {'; '.join(errors)}" if errors else ""
         total_part = f" | итог: {r['total']}" if r["total"] is not None else ""
-        lines.append(f"{r['date']} | {r['user_name']} | {r['summary']}{total_part}{err_part}")
+        inc = r.get("income")
+        exp = r.get("expenses")
+        money_part = ""
+        if inc is not None or exp is not None:
+            money_part = f" | доходы: {inc}, расходы: {exp}"
+        lines.append(f"{r['date']} | {r['user_name']} | {r['summary']}"
+                     f"{total_part}{money_part}{err_part}")
     payload = f"Период: {period_label}\nОтчёты:\n" + "\n".join(lines)
     try:
         resp = await _get_client().messages.create(
             model=MODEL,
-            max_tokens=1500,
+            max_tokens=6000,
             system=SUMMARY_SYSTEM,
             messages=[{"role": "user", "content": payload}],
         )

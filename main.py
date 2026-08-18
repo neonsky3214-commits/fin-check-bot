@@ -64,15 +64,41 @@ async def _process(message: Message, text: str) -> None:
         return
     log.info("Сообщение похоже на отчёт, отправляю на проверку: %r", text[:80])
     result = await check_report(text)
-    if result is None or not result.get("is_report"):
+    if result is None:
+        await message.reply(
+            "⚙️ Не смог проверить это сообщение — техническая ошибка. "
+            "Отправьте отчёт ещё раз."
+        )
         return
+    if not result.get("is_report"):
+        return
+    log.info("Отчёт распознан, сохраняю. Ошибки: %s", result.get("errors"))
     user = message.from_user.full_name if message.from_user else "неизвестно"
     db.save_report(message.chat.id, message.message_id, user, text, result)
+    recount = _format_recount(result)
     if result.get("has_errors"):
         errors = "\n".join(f"• {e}" for e in result.get("errors") or [])
-        await message.reply(f"⚠️ Нашёл расхождения в отчёте:\n{errors}")
+        await message.reply(f"⚠️ Нашёл расхождения в отчёте:\n{errors}{recount}")
     else:
-        await message.reply("✅ Проверил: суммы сходятся.")
+        await message.reply(f"✅ Проверил: суммы сходятся.{recount}")
+
+
+def _fmt_money(n: float) -> str:
+    return f"{n:,.0f}".replace(",", " ")
+
+
+def _format_recount(result: dict) -> str:
+    income, expenses = result.get("income"), result.get("expenses")
+    parts = []
+    if income is not None:
+        parts.append(f"доходы {_fmt_money(income)} ₽")
+    if expenses is not None:
+        parts.append(f"расходы {_fmt_money(expenses)} ₽")
+    if income is not None and expenses is not None:
+        parts.append(f"разница {_fmt_money(income - expenses)} ₽")
+    if not parts:
+        return ""
+    return "\n\n📊 Мой пересчёт: " + ", ".join(parts) + "."
 
 
 @dp.message(F.text, F.chat.type.in_(_CHATS))

@@ -33,6 +33,11 @@ def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     with _connect() as conn:
         conn.executescript(_SCHEMA)
+        for col in ("income", "expenses"):
+            try:
+                conn.execute(f"ALTER TABLE reports ADD COLUMN {col} REAL")
+            except sqlite3.OperationalError:
+                pass  # колонка уже есть
 
 
 def save_report(chat_id: int, message_id: int, user_name: str, text: str,
@@ -44,8 +49,8 @@ def save_report(chat_id: int, message_id: int, user_name: str, text: str,
         )
         conn.execute(
             "INSERT INTO reports (chat_id, message_id, user_name, date, text,"
-            " total, has_errors, errors_json, summary)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " total, has_errors, errors_json, summary, income, expenses)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 chat_id,
                 message_id,
@@ -56,6 +61,8 @@ def save_report(chat_id: int, message_id: int, user_name: str, text: str,
                 1 if result.get("has_errors") else 0,
                 json.dumps(result.get("errors") or [], ensure_ascii=False),
                 result.get("summary") or "",
+                result.get("income"),
+                result.get("expenses"),
             ),
         )
 
